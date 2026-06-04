@@ -64,11 +64,14 @@ def main():
     if port:
         # Production: Use webhook
         port = int(port)
-        logger.info(f"Bot starting... webhook mode on port {port}")
+        railway_url = os.getenv("RAILWAY_PUBLIC_DOMAIN", "pash-client-price-bot.up.railway.app")
+        webhook_url = f"https://{railway_url}/telegram"
+        logger.info(f"Bot starting... webhook mode on port {port}, url={webhook_url}")
         app.run_webhook(
             listen="0.0.0.0",
             port=port,
             url_path="/telegram",
+            webhook_url=webhook_url,
             allowed_updates=Update.ALL_TYPES
         )
     else:
