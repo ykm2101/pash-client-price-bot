@@ -58,8 +58,6 @@ def main():
     app.add_handler(CallbackQueryHandler(location_callback, pattern="^location_"))
     app.add_handler(CallbackQueryHandler(confirm_callback, pattern="^unit_"))
 
-    import os
-
     # Check if running on Railway (has PORT env var)
     port = os.getenv("PORT")
 
