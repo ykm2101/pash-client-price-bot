@@ -58,8 +58,21 @@ def main():
     app.add_handler(CallbackQueryHandler(location_callback, pattern="^location_"))
     app.add_handler(CallbackQueryHandler(confirm_callback, pattern="^unit_"))
 
-    logger.info("Bot starting... polling mode")
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    # Use webhook on production (Railway), polling on local
+    import os
+    if os.getenv("RAILWAY_ENVIRONMENT"):
+        # Production on Railway - use webhook
+        logger.info("Bot starting... webhook mode (Railway)")
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=int(os.getenv("PORT", 8000)),
+            url_path="/telegram",
+            allowed_updates=Update.ALL_TYPES
+        )
+    else:
+        # Local development - use polling
+        logger.info("Bot starting... polling mode (local)")
+        app.run_polling(allowed_updates=Update.ALL_TYPES)
 
 if __name__ == "__main__":
     main()
