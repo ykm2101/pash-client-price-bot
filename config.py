@@ -8,5 +8,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
 
+BOT_USERNAME = os.getenv("BOT_USERNAME", "pash_bot")
+
 if not all([TELEGRAM_BOT_TOKEN_CLIENT, GEMINI_API_KEY, SUPABASE_URL, SUPABASE_ANON_KEY]):
     raise ValueError("Missing required environment variables in .env")

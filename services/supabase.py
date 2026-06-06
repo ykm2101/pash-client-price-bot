@@ -13,19 +13,50 @@ class SupabaseService:
         key = os.getenv("SUPABASE_ANON_KEY")
         self.client: Client = create_client(url, key)
 
-    async def upsert_user(self, telegram_id: int, username: Optional[str], full_name: Optional[str], language: str = 'ru') -> Dict[str, Any]:
-        """Upsert user in users table"""
-        data = {
-            "telegram_id": telegram_id,
-            "username": username,
-            "full_name": full_name,
-            "language": language,
-            "last_seen_at": datetime.utcnow().isoformat()
-        }
-
+    async def upsert_user(
+        self,
+        telegram_id: int,
+        username: Optional[str],
+        full_name: Optional[str],
+        language: str = 'ru',
+        referred_by: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Upsert user in users table.
+        For new users: saves referred_by.
+        For existing users: updates only username/full_name/last_seen — never overwrites referred_by.
+        """
+        now = datetime.utcnow().isoformat()
         try:
-            response = self.client.table("users").upsert(data).execute()
-            return response.data[0] if response.data else data
+            existing = await self.get_user(telegram_id)
+
+            if existing:
+                # Update mutable fields only — do NOT touch referred_by
+                update_data = {
+                    "username": username,
+                    "full_name": full_name,
+                    "last_seen_at": now,
+                }
+                response = (
+                    self.client.table("users")
+                    .update(update_data)
+                    .eq("telegram_id", telegram_id)
+                    .execute()
+                )
+                return response.data[0] if response.data else existing
+            else:
+                # New user — save referred_by if provided
+                insert_data = {
+                    "telegram_id": telegram_id,
+                    "username": username,
+                    "full_name": full_name,
+                    "language": language,
+                    "last_seen_at": now,
+                    "referred_by": referred_by,
+                }
+                response = self.client.table("users").insert(insert_data).execute()
+                return response.data[0] if response.data else insert_data
+
         except Exception as e:
             logger.error(f"Error upserting user {telegram_id}: {e}")
             raise

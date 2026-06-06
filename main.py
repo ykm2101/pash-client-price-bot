@@ -17,6 +17,7 @@ from telegram.ext import (
 sys.path.insert(0, str(Path(__file__).parent))
 
 from handlers.start import start_command
+from handlers.referral import referral_command
 from handlers.text import text_handler
 from handlers.voice import voice_handler
 from handlers.photo import photo_handler
@@ -45,6 +46,7 @@ def main():
 
     # Commands
     app.add_handler(CommandHandler("start", start_command))
+    app.add_handler(CommandHandler("referral", referral_command))
 
     # Message handlers
     app.add_handler(MessageHandler(filters.VOICE, voice_handler))
