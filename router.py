@@ -25,6 +25,12 @@ GREETING_PATTERNS = [
     "доброе утро", "добрый вечер", "хай", "хэй"
 ]
 
+REFERRAL_PATTERNS = [
+    "реферальная", "реферал", "ссылка", "пригласить", "пригласи",
+    "моя ссылка", "invite", "referral", "позвать друга", "друзьям",
+    "поделиться ссылкой", "реф ссылка"
+]
+
 
 HELP_TEXT = """Вот что я умею! 🎩
 
@@ -77,5 +83,9 @@ def route(text: str) -> Optional[str]:
             "Актуальный каталог на pash.kz\n"
             "Просто отправьте название товара — сравню цену! 💰"
         )
+
+    # Referral link
+    if any(p in text_lower for p in REFERRAL_PATTERNS):
+        return "Напишите /referral — дам вашу личную ссылку для друзей 🔗"
 
     return None  # Pass to Gemini
