@@ -2,7 +2,7 @@ import logging
 from telegram import Update
 from telegram.ext import ContextTypes
 from models import Session
-from services.gemini import parse_free_text
+from services.gemini import parse_free_text, chat_assistant
 from handlers.confirm import show_confirmation
 from router import route
 
@@ -36,7 +36,8 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             context.user_data["session"] = session
             await show_confirmation(update, context, session)
         else:
-            await update.message.reply_text("Не поняла 🤔 Попробуй ещё раз")
+            answer = await chat_assistant(text)
+            await update.message.reply_text(answer)
         return
 
     # Check if user is answering district question
@@ -68,7 +69,9 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     parsed = await parse_free_text(text)
 
     if not parsed.items:
-        await update.message.reply_text("Не поняла 🤔 Повтори, пожалуйста? Например: 'банан 920 магнум'")
+        # Not a price — answer as general assistant
+        answer = await chat_assistant(text)
+        await update.message.reply_text(answer)
         return
 
     # Multiple items → batch mode
