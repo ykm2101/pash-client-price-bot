@@ -4,6 +4,7 @@ from telegram.ext import ContextTypes
 from models import Session
 from services.gemini import parse_free_text
 from handlers.confirm import show_confirmation
+from router import route
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +13,31 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     user = update.effective_user
     text = update.message.text
+
+    # Check if user is correcting a batch
+    if context.user_data.get("awaiting_batch_edit"):
+        context.user_data.pop("awaiting_batch_edit", None)
+        context.user_data.pop("batch", None)
+        parsed = await parse_free_text(text)
+        if parsed.items and len(parsed.items) > 1:
+            await handle_batch_input(update, context, parsed)
+        elif parsed.items:
+            session = Session()
+            session.items = parsed.items
+            item = parsed.items[0]
+            session.partial = {
+                "product": item.product,
+                "price": item.price,
+                "unit": item.unit,
+                "source": parsed.source or item.source,
+                "source_detail": parsed.source_detail or item.source_detail,
+                "district": None
+            }
+            context.user_data["session"] = session
+            await show_confirmation(update, context, session)
+        else:
+            await update.message.reply_text("Не поняла 🤔 Попробуй ещё раз")
+        return
 
     # Check if user is answering district question
     if context.user_data.get("awaiting_district_text"):
@@ -30,6 +56,12 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     if session and session.missing_field:
         # User is answering a specific question
         await handle_missing_field_response(update, context, session, text)
+        return
+
+    # Check router first (static responses, no Gemini needed)
+    routed = route(text)
+    if routed:
+        await update.message.reply_text(routed, parse_mode="Markdown")
         return
 
     # Parse text with Gemini
@@ -80,7 +112,8 @@ async def handle_batch_input(update, context, parsed) -> None:
     confirmation_text = format_batch_confirmation(parsed.items, parsed.source, parsed.source_detail)
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("✅ Да, всё верно", callback_data="batch_confirm"),
+            InlineKeyboardButton("✅ Верно", callback_data="batch_confirm"),
+            InlineKeyboardButton("✏️ Исправить", callback_data="batch_edit"),
             InlineKeyboardButton("❌ Отмена", callback_data="batch_cancel")
         ]
     ])

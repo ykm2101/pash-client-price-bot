@@ -79,7 +79,8 @@ async def handle_receipt(update, context, parsed) -> None:
     confirmation_text = format_batch_confirmation(parsed.items, parsed.source, parsed.source_detail)
     keyboard = InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("✅ Да, всё верно", callback_data="batch_confirm"),
+            InlineKeyboardButton("✅ Верно", callback_data="batch_confirm"),
+            InlineKeyboardButton("✏️ Исправить", callback_data="batch_edit"),
             InlineKeyboardButton("❌ Отмена", callback_data="batch_cancel")
         ]
     ])

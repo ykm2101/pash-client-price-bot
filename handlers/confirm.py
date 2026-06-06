@@ -374,6 +374,28 @@ async def batch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         await query.edit_message_text("❌ Отменили")
         return
 
+    if query.data == "batch_edit":
+        batch = context.user_data.get("batch")
+        if not batch:
+            await query.edit_message_text("Сессия истекла, повтори с начала")
+            return
+
+        from services.batch_processor import format_batch_editable
+        from telegram import ForceReply
+
+        editable_text = format_batch_editable(
+            batch["items"], batch["source"], batch["source_detail"]
+        )
+
+        await query.edit_message_text("✏️ Исправь и отправь заново:")
+        await context.bot.send_message(
+            chat_id=query.from_user.id,
+            text=editable_text,
+            reply_markup=ForceReply(selective=True, input_field_placeholder="Исправь здесь...")
+        )
+        context.user_data["awaiting_batch_edit"] = True
+        return
+
     if query.data == "batch_confirm":
         batch = context.user_data.get("batch")
         if not batch:

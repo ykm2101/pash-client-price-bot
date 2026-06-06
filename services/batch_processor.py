@@ -153,3 +153,20 @@ def format_batch_confirmation(items: List[PriceEntry], source: Optional[str], so
 
     lines.append("\nВсё верно?")
     return "\n".join(lines)
+
+
+def format_batch_editable(items: List[PriceEntry], source: Optional[str], source_detail: Optional[str]) -> str:
+    """Format items as editable text for user to correct."""
+
+    # Source suffix
+    source_suffix = ""
+    if source_detail:
+        source_suffix = f" {source_detail}"
+    elif source:
+        source_suffix = f" {source}"
+
+    lines = []
+    for item in items:
+        lines.append(f"{item.product} {int(item.price)}{source_suffix}")
+
+    return "\n".join(lines)
