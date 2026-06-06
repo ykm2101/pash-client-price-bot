@@ -1,6 +1,6 @@
 import logging
 import os
-from telegram import Update
+from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 from models import Session
 from services.gemini import parse_photo
@@ -9,50 +9,78 @@ from handlers.confirm import show_confirmation
 logger = logging.getLogger(__name__)
 
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle photo - extract price tag info"""
+    """Handle photo — single price tag or receipt with multiple items."""
 
     try:
-        photo_file = update.message.photo[-1]  # Get highest resolution
+        photo_file = update.message.photo[-1]
 
         # Download photo
         file = await context.bot.get_file(photo_file.file_id)
         photo_path = f"/tmp/photo_{update.effective_user.id}.jpg"
         await file.download_to_drive(photo_path)
 
-        # Extract text from photo with Gemini
         with open(photo_path, 'rb') as f:
             photo_bytes = f.read()
 
-        # Clean up
         if os.path.exists(photo_path):
             os.remove(photo_path)
 
         # Parse photo
         parsed = await parse_photo(photo_bytes)
 
-        # Store in session
+        if not parsed.items:
+            await update.message.reply_text(
+                "Couldn't read the price tag 🤔\n(Не разобрала ценник — попробуй получше или напиши текстом)"
+            )
+            return
+
+        # Multiple items → batch mode (receipt)
+        if len(parsed.items) > 1:
+            await handle_receipt(update, context, parsed)
+            return
+
+        # Single item → standard flow
         session = Session()
         session.items = parsed.items
         session.language = parsed.language
 
-        if parsed.items:
-            item = parsed.items[0]
-            session.partial = {
-                "product": item.product,
-                "price": item.price,
-                "unit": item.unit,
-                "source": parsed.source or item.source,
-                "source_detail": parsed.source_detail or item.source_detail,
-                "district": None
-            }
+        item = parsed.items[0]
+        session.partial = {
+            "product": item.product,
+            "price": item.price,
+            "unit": item.unit,
+            "source": parsed.source or item.source,
+            "source_detail": parsed.source_detail or item.source_detail,
+            "district": None
+        }
 
-            context.user_data["session"] = session
-
-            # Show confirmation
-            await show_confirmation(update, context, session)
-        else:
-            await update.message.reply_text("Не разобрала ценник 🤔 Попробуй получше или напиши текстом")
+        context.user_data["session"] = session
+        await show_confirmation(update, context, session)
 
     except Exception as e:
         logger.error(f"Error processing photo: {e}")
-        await update.message.reply_text("Ошибка с фото 😞 Повтори, пожалуйста")
+        await update.message.reply_text(
+            "Photo error 😞 Try again please\n(Ошибка с фото — повтори, пожалуйста)"
+        )
+
+
+async def handle_receipt(update, context, parsed) -> None:
+    """Handle receipt photo with multiple items."""
+    from services.batch_processor import format_batch_confirmation
+
+    # Store batch
+    context.user_data["batch"] = {
+        "items": parsed.items,
+        "source": parsed.source,
+        "source_detail": parsed.source_detail,
+    }
+    context.user_data.pop("session", None)
+
+    confirmation_text = format_batch_confirmation(parsed.items, parsed.source, parsed.source_detail)
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✅ Да, всё верно", callback_data="batch_confirm"),
+            InlineKeyboardButton("❌ Отмена", callback_data="batch_cancel")
+        ]
+    ])
+    await update.message.reply_text(confirmation_text, reply_markup=keyboard)

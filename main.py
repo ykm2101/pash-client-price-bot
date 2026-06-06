@@ -20,7 +20,7 @@ from handlers.start import start_command
 from handlers.text import text_handler
 from handlers.voice import voice_handler
 from handlers.photo import photo_handler
-from handlers.confirm import confirm_callback, location_callback, location_text_handler, location_handler
+from handlers.confirm import confirm_callback, location_callback, location_text_handler, location_handler, batch_callback
 
 # Load environment variables
 load_dotenv()
@@ -57,6 +57,7 @@ def main():
     app.add_handler(CallbackQueryHandler(confirm_callback, pattern="^source_"))
     app.add_handler(CallbackQueryHandler(location_callback, pattern="^location_"))
     app.add_handler(CallbackQueryHandler(confirm_callback, pattern="^unit_"))
+    app.add_handler(CallbackQueryHandler(batch_callback, pattern="^batch_"))
 
     # Check if running on Railway (has PORT env var)
     port = os.getenv("PORT")

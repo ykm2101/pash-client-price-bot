@@ -361,3 +361,84 @@ async def location_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
     context.user_data.pop("awaiting_location", None)
     await update.message.reply_text(f"Cheers! 🙏 Got it: {district}\n(Спасибо! Записала район: {district})")
+
+
+async def batch_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle batch confirmation buttons."""
+
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "batch_cancel":
+        context.user_data.pop("batch", None)
+        await query.edit_message_text("❌ Отменили")
+        return
+
+    if query.data == "batch_confirm":
+        batch = context.user_data.get("batch")
+        if not batch:
+            await query.edit_message_text("Сессия истекла, повтори с начала")
+            return
+
+        await query.edit_message_text("⏳ Сравниваю с ценами PÄSH...")
+
+        user = update.effective_user
+        supabase = SupabaseService()
+
+        # Get user's district
+        user_data = await supabase.get_user(user.id)
+        district = user_data.get("district") if user_data else None
+
+        try:
+            from services.batch_processor import process_batch, save_batch
+            from services.comparison import lookup_and_compare
+
+            items = batch["items"]
+            source = batch["source"]
+            source_detail = batch["source_detail"]
+
+            # Process all items
+            text, keyboard = await process_batch(
+                items=items,
+                source=source,
+                source_detail=source_detail,
+                district=district,
+                user_id=user.id,
+                supabase=supabase
+            )
+
+            # Send results
+            await context.bot.send_message(
+                chat_id=user.id,
+                text=text,
+                reply_markup=InlineKeyboardMarkup(keyboard["inline_keyboard"]),
+                parse_mode="Markdown"
+            )
+
+            # Save to DB
+            results = []
+            for item in items:
+                result = await lookup_and_compare(
+                    product_name=item.product,
+                    submitted_price=item.price,
+                    source=source or item.source,
+                    source_detail=source_detail or item.source_detail,
+                    district=district,
+                    supabase_service=supabase
+                )
+                results.append(result)
+
+            await save_batch(results, user.id, district, supabase)
+
+            context.user_data.pop("batch", None)
+
+            # Ask for district if not set
+            if not district:
+                await ask_for_district(update, context, user.id, supabase)
+
+        except Exception as e:
+            logger.error(f"Error in batch processing: {e}")
+            await context.bot.send_message(
+                chat_id=user.id,
+                text="Ошибка при обработке 😞 Повтори, пожалуйста"
+            )

@@ -35,29 +35,56 @@ async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     # Parse text with Gemini
     parsed = await parse_free_text(text)
 
-    # Store in session
+    if not parsed.items:
+        await update.message.reply_text("Не поняла 🤔 Повтори, пожалуйста? Например: 'банан 920 магнум'")
+        return
+
+    # Multiple items → batch mode
+    if len(parsed.items) > 1:
+        await handle_batch_input(update, context, parsed)
+        return
+
+    # Single item → standard flow
     session = Session()
     session.items = parsed.items
     session.source = parsed.source
     session.language = parsed.language
 
-    if parsed.items:
-        item = parsed.items[0]
-        session.partial = {
-            "product": item.product,
-            "price": item.price,
-            "unit": item.unit,
-            "source": parsed.source or item.source,
-            "source_detail": parsed.source_detail or item.source_detail,
-            "district": None
-        }
+    item = parsed.items[0]
+    session.partial = {
+        "product": item.product,
+        "price": item.price,
+        "unit": item.unit,
+        "source": parsed.source or item.source,
+        "source_detail": parsed.source_detail or item.source_detail,
+        "district": None
+    }
 
-        context.user_data["session"] = session
+    context.user_data["session"] = session
+    await show_confirmation(update, context, session)
 
-        # Show confirmation
-        await show_confirmation(update, context, session)
-    else:
-        await update.message.reply_text("Не поняла 🤔 Повтори, пожалуйста? Например: 'банан 920 магнум'")
+
+async def handle_batch_input(update, context, parsed) -> None:
+    """Handle multiple items — show list confirmation."""
+    from services.batch_processor import format_batch_confirmation
+    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+
+    # Store batch in user_data
+    context.user_data["batch"] = {
+        "items": parsed.items,
+        "source": parsed.source,
+        "source_detail": parsed.source_detail,
+    }
+    context.user_data.pop("session", None)
+
+    confirmation_text = format_batch_confirmation(parsed.items, parsed.source, parsed.source_detail)
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✅ Да, всё верно", callback_data="batch_confirm"),
+            InlineKeyboardButton("❌ Отмена", callback_data="batch_cancel")
+        ]
+    ])
+    await update.message.reply_text(confirmation_text, reply_markup=keyboard)
 
 async def handle_missing_field_response(update: Update, context: ContextTypes.DEFAULT_TYPE, session: Session, text: str) -> None:
     """Handle response to a specific missing field question"""
