@@ -5,14 +5,41 @@ from models import Session
 from services.gemini import parse_free_text, chat_assistant
 from handlers.confirm import show_confirmation
 from router import route
+from config import BOT_USERNAME, ADMIN_TELEGRAM_ID
 
 logger = logging.getLogger(__name__)
+
+GROUP_TRIGGER_WORDS = ['качество', 'свежесть', 'свежее', 'испорченный', 'плохой']
+GROUP_NEGATIVE_WORDS = ['испорченный', 'плохой']
 
 async def text_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle text input - parse and show confirmation"""
 
     user = update.effective_user
-    text = update.message.text
+    text = update.message.text or ''
+
+    # --- Group / supergroup behavior ---
+    if update.message.chat.type in ['group', 'supergroup']:
+        bot_mentioned = f'@{BOT_USERNAME}' in text
+        triggered = any(w in text.lower() for w in GROUP_TRIGGER_WORDS)
+
+        if not bot_mentioned and not triggered:
+            return  # ignore everything else in groups
+
+        # Negative complaint → apology + admin ping
+        if any(w in text.lower() for w in GROUP_NEGATIVE_WORDS):
+            await update.message.reply_text(
+                "Сожалеем что так получилось 🙏\n"
+                "Разберёмся и вернёмся с ответом.\n"
+                f"{ADMIN_TELEGRAM_ID} уже в курсе.\n"
+                "Напиши подробнее — поможет решить быстрее."
+            )
+            return
+
+        # Strip bot mention so it doesn't confuse price parsing
+        if bot_mentioned:
+            text = text.replace(f'@{BOT_USERNAME}', '').strip()
+    # --- End group behavior ---
 
     # Check if user is correcting a batch
     if context.user_data.get("awaiting_batch_edit"):

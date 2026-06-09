@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from handlers.start import start_command
 from handlers.referral import referral_command
+from scheduler import create_scheduler
 from handlers.text import text_handler
 from handlers.voice import voice_handler
 from handlers.photo import photo_handler
@@ -43,6 +44,10 @@ def main():
         sys.exit(1)
 
     app = Application.builder().token(token).build()
+
+    # Scheduler — auto-posts to @pash_channel
+    scheduler = create_scheduler(app.bot)
+    scheduler.start()
 
     # Commands
     app.add_handler(CommandHandler("start", start_command))

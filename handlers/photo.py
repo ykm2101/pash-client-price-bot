@@ -5,11 +5,34 @@ from telegram.ext import ContextTypes
 from models import Session
 from services.gemini import parse_photo
 from handlers.confirm import show_confirmation
+from config import BOT_USERNAME, ADMIN_TELEGRAM_ID
 
 logger = logging.getLogger(__name__)
 
+GROUP_TRIGGER_WORDS = ['качество', 'свежесть', 'свежее', 'испорченный', 'плохой']
+GROUP_NEGATIVE_WORDS = ['испорченный', 'плохой']
+
+
 async def photo_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle photo — single price tag or receipt with multiple items."""
+
+    # Group mode: respond only if mentioned in caption or negative trigger
+    if update.message.chat.type in ['group', 'supergroup']:
+        caption = update.message.caption or ''
+        bot_mentioned = f'@{BOT_USERNAME}' in caption
+        triggered = any(w in caption.lower() for w in GROUP_TRIGGER_WORDS)
+
+        if not bot_mentioned and not triggered:
+            return
+
+        if any(w in caption.lower() for w in GROUP_NEGATIVE_WORDS):
+            await update.message.reply_text(
+                "Сожалеем что так получилось 🙏\n"
+                "Разберёмся и вернёмся с ответом.\n"
+                f"{ADMIN_TELEGRAM_ID} уже в курсе.\n"
+                "Напиши подробнее — поможет решить быстрее."
+            )
+            return
 
     try:
         photo_file = update.message.photo[-1]

@@ -5,11 +5,21 @@ from telegram.ext import ContextTypes
 from models import Session
 from services.gemini import transcribe_and_parse
 from handlers.confirm import show_confirmation
+from config import BOT_USERNAME, ADMIN_TELEGRAM_ID
 
 logger = logging.getLogger(__name__)
 
+GROUP_TRIGGER_WORDS = ['качество', 'свежесть', 'свежее', 'испорченный', 'плохой']
+GROUP_NEGATIVE_WORDS = ['испорченный', 'плохой']
+
 async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle voice message - transcribe and parse"""
+
+    # Group mode: only respond if bot is mentioned in caption
+    if update.message.chat.type in ['group', 'supergroup']:
+        caption = update.message.caption or ''
+        if f'@{BOT_USERNAME}' not in caption:
+            return
 
     try:
         voice_file = update.message.voice
