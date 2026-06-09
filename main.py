@@ -35,6 +35,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+async def on_startup(application: Application) -> None:
+    """Start APScheduler after the asyncio event loop is running."""
+    scheduler = create_scheduler(application.bot)
+    scheduler.start()
+    logger.info("Scheduler started")
+
+
 def main():
     """Start bot"""
 
@@ -43,11 +50,7 @@ def main():
         logger.error("TELEGRAM_BOT_TOKEN_CLIENT not set")
         sys.exit(1)
 
-    app = Application.builder().token(token).build()
-
-    # Scheduler — auto-posts to @pash_channel
-    scheduler = create_scheduler(app.bot)
-    scheduler.start()
+    app = Application.builder().token(token).post_init(on_startup).build()
 
     # Commands
     app.add_handler(CommandHandler("start", start_command))
