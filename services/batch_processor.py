@@ -83,12 +83,6 @@ async def format_batch_response(
         if result.savings_abs and result.savings_pct:
             lines.append(f"💰 Экономия: {format_number(result.savings_abs)} ₸ ({int(result.savings_pct)}%)")
 
-        # Container info
-        if result.container_info and result.pash_price:
-            for container_type, weight_kg in result.container_info.items():
-                total_price = result.pash_price * weight_kg
-                lines.append(f"📦 {container_type.capitalize()} {weight_kg} кг — {format_number(total_price)} ₸")
-
         # Social proof
         if result.product_id:
             count = await supabase.get_social_proof(result.product_id, district)

@@ -131,12 +131,6 @@ def format_response(result: ComparisonResult, social_proof_count: int) -> tuple[
     if result.savings_abs is not None and result.savings_pct is not None:
         text += f"💰 Экономия: {format_number(result.savings_abs)} ₸/кг ({int(result.savings_pct)}%)\n\n"
 
-    # Container info
-    if result.container_info and result.pash_price:
-        for container_type, weight_kg in result.container_info.items():
-            total_price = result.pash_price * weight_kg
-            text += f"📦 Берём {container_type.lower()} {weight_kg} кг — {format_number(total_price)} ₸ на pash.kz\n"
-
     # Social proof
     if social_proof_count >= 5:
         district_text = f" в {result.district}" if result.district else ""
